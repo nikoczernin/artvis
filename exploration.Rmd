@@ -1,0 +1,41 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+library(tidyverse)
+```
+
+
+```{r}
+seq(1900,2000)[sample(1:100, 80)] %>% 
+  sample(1e3, replace = T) %>% 
+  data.frame(year=.) %>% 
+  group_by(year) %>% 
+  count() %>% 
+  print() %>% 
+  ggplot(aes(x=year, y=n))+
+  geom_bar(stat="identity") +
+  theme_minimal() +
+  theme(
+    panel.grid =element_blank(),
+    axis.text.y = element_blank()
+  )
+```
+
+
+```{r}
+artvis
+```
+
+```{r}
+artvis %>% 
+  select(e.title, e.paintings) %>% 
+  group_by(e.title) %>%
+  summarise(p=n_distinct(e.paintings))
+  print()
+```
+
+
+

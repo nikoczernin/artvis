@@ -30,8 +30,8 @@ ui <- fluidPage(
 
 # Define server logic required to draw a histogram
 server <- function(input, output) {
-  # read in the preprocessed data
-  artvis <- readRDS("artvis.rds")
+  # read in the NEW preprocessed data
+  artvis <- read.csv("artvis_dump_NEW.csv", sep = ";") %>% print()
   
   # when grouping data over the different time periods, you need to 
   # get a set of all years in order
