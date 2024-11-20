@@ -40,8 +40,9 @@ server <- function(input, output) {
   output$var_selection <- renderUI({
     selectizeInput(
       "var_of_interest",
-      "Select a variable",
-      choices = c("exhibitions", "paintings")
+      "Select a variable to count",
+      choices = list("Number of exhibitions"="exhibitions", 
+                     "Number of paintings"="paintings")
     )
   })
     
