@@ -12,6 +12,8 @@ library(stringr)
 library(tidyverse)
 library(shinyWidgets)
 
+source("./choropleth.R")
+
 
 # Define UI for application that draws a histogram
 ui <- fluidPage(
@@ -41,7 +43,9 @@ ui <- fluidPage(
               textOutput("display_period"),
               height="10%"
            ),
-           fluidRow(height="30%"),
+           fluidRow(
+             plotOutput("choropleth"),
+             height="60%"),
            fluidRow(
               div( class = "inline-plot", plotOutput("top_k_artists")),
               div( class = "inline-plot", plotOutput("top_k_countries")),
@@ -207,6 +211,20 @@ server <- function(input, output, session) {
           panel.grid = element_blank()
         )
     })
+  
+  
+  
+  ##### Choropleth Map ##### 
+  output$choropleth <- renderPlot({
+    # prepare the plot data (summarise)
+    artvis %>%
+      group_by(e.country) %>%
+      summarise(n_exhibits = n_distinct(e.id)) %>%
+      # pass it to the choropleth
+      choropleth("n_exhibits", "e.country")
+  })
+  
+  
   
   
   
