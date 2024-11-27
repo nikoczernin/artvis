@@ -11,6 +11,7 @@ library(shiny)
 library(stringr)
 library(tidyverse)
 library(shinyWidgets)
+library(leaflet)
 
 source("./choropleth.R")
 
@@ -44,7 +45,7 @@ ui <- fluidPage(
               height="10%"
            ),
            fluidRow(
-             plotOutput("choropleth"),
+             leafletOutput("choropleth"),
              height="60%"),
            fluidRow(
               div( class = "inline-plot", plotOutput("top_k_artists")),
@@ -55,6 +56,7 @@ ui <- fluidPage(
          ),
   ),
 )
+
 
 # Define server logic required to draw a histogram
 server <- function(input, output, session) {
@@ -215,7 +217,7 @@ server <- function(input, output, session) {
   
   
   ##### Choropleth Map ##### 
-  output$choropleth <- renderPlot({
+  output$choropleth <- renderLeaflet({
     # prepare the plot data (summarise)
     artvis %>%
       group_by(e.country) %>%
