@@ -63,7 +63,7 @@ server <- function(input, output, session) {
   ns <- session$ns
   
   # read in the NEW preprocessed data
-  artvis <- read.csv("artvis_dump_NEW.csv", sep = ";") %>% 
+  artvis <- read.csv("./data/artvis_dump_NEW.csv", sep = ";") %>% 
     # generate full name columns
     mutate(
       a.fullname = paste(a.firstname, a.lastname),

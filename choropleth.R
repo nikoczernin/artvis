@@ -2,10 +2,10 @@ library(leaflet)
 library(sf)
 
 
-WORLD_DATA <<- read_sf("./data/TM_WORLD_BORDERS_SIMPL-0.3.shp")
+WORLD_DATA <<- read_sf("./data/worldmap/TM_WORLD_BORDERS_SIMPL-0.3.shp")
 
 
-choropleth <- function(plot_data, x, iso2_column="ISO2"){
+choropleth <<- function(plot_data, x, iso2_column="ISO2"){
   # plot data needs to have a coutnry  code iso2 column
   # you also have to rename the variable in the plot data 
   plot_data <- plot_data %>% rename(mapvar = x)
