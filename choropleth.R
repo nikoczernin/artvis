@@ -31,7 +31,7 @@ choropleth <<- function(plot_data, x, iso2_column="ISO2"){
   map_data %>% 
     leaflet() %>%
     addTiles() %>%
-    setView(lat = 10, lng = 0, zoom = 2) %>%
+    setView(0, 0, zoom = 4) %>%
     addPolygons(
       fillColor = ~ mypalette(mapvar), 
       stroke = FALSE,
@@ -42,7 +42,7 @@ choropleth <<- function(plot_data, x, iso2_column="ISO2"){
       labelOptions = labelOptions(
         style = list("font-weight" = "normal", padding = "3px 8px"),
         textsize = "13px",
-        direction = "auto"
+        # direction = "auto"
       )
     )
 }
@@ -57,7 +57,5 @@ choropleth <<- function(plot_data, x, iso2_column="ISO2"){
 #   summarise(n_exhibits = n_distinct(e.id)) %>%
 #   # pass it to the choropleth
 #   choropleth("n_exhibits", "e.country")
-# 
-# 
 
 

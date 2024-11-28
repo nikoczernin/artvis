@@ -73,7 +73,7 @@ ui <- fluidPage(
              height = "10%"
            ),
            fluidRow(
-             # leafletOutput("choropleth"),    # Interactive choropleth map
+             leafletOutput("choropleth"),    # Interactive choropleth map
              height="60%"),
            fluidRow(
              # Three inline bar plots for top artists, countries, and venues
@@ -127,10 +127,12 @@ server <- function(input, output, session) {
   })
   
   
-  # get the number 
-  get_aggregate <- function(data, grouping.var){
+  
+  ##### Grouped Variable Aggregation ##### 
+  # get the aggregate number per group of the selected variable at interest
+  get_aggregate <- function(data, grouping.var, keep.groups=TRUE){
     # aggregate the selected variable per artist
-    data %>% 
+    aggregated.data <- data %>% 
       # apply the date filter
       filter(e.startdate %>% between(input$period[1], input$period[2])) %>% 
       group_by(across(all_of(grouping.var))) %>% 
@@ -144,21 +146,23 @@ server <- function(input, output, session) {
       } %>% 
       # now join it back with all artists so that filtered out artists
       # get a zero
-      right_join(data %>% select(!!grouping.var) %>% unique()) %>%
+      right_join(data %>% select(!!grouping.var) %>% unique(), by=c(grouping.var)) %>%
       mutate(n = ifelse(is.na(n), 0, n)) %>%
-      arrange(!!sym(grouping.var)) %>%
-      .$n
+      arrange(!!sym(grouping.var))
+    # if groups are not asked for in keep.groups, only return the values
+    if (!keep.groups) aggregated.data <- aggregated.data$n
+    aggregated.data
   }
   
   
   
-  ##### Get aggregates of selected variable #####
+  ###### Get aggregates of selected variable #####
   #### Get artist aggregates
   artist.totals <- reactive({
     req(input$var_of_interest)
     req(input$period)
     # aggregate the selected variable per artist
-    artvis %>% get_aggregate("a.fullname")
+    artvis %>% get_aggregate("a.fullname", keep.groups=FALSE)
   })
   
   
@@ -167,7 +171,7 @@ server <- function(input, output, session) {
     req(input$var_of_interest)
     req(input$period)
     # aggregate the selected variable per artist
-    artvis %>% get_aggregate("e.country")
+    artvis %>% get_aggregate("e.country", keep.groups=FALSE)
   })
   
   
@@ -176,14 +180,14 @@ server <- function(input, output, session) {
     req(input$var_of_interest)
     req(input$period)
     # aggregate the selected variable per artist
-    artvis %>% get_aggregate("e.venue")
+    artvis %>% get_aggregate("e.venue", keep.groups=FALSE)
   })
   
   
   
   
   
-  ##### Get unique category values #####
+  ###### Get unique category values #####
   
   # get all artist names, sorted
   all.artists <- artvis %>% 
@@ -283,9 +287,6 @@ server <- function(input, output, session) {
   })
   
   
-  
-  
-  
   ##### Barplot: Exhibitions Over Time #####
   # Bar plot showing the number of exhibitions per year
   output$vals_over_time <- renderPlot({
@@ -294,7 +295,7 @@ server <- function(input, output, session) {
       group_by(e.startdate) %>% 
       summarise(n_exhibs = n_distinct(e.title)) %>% 
       mutate(year = e.startdate %>% as.numeric()) %>% 
-      full_join(data.frame(year=all_years)) %>% 
+      full_join(data.frame(year=all_years), by="year") %>% 
       arrange(year) %>% 
       mutate(n_exhibs=ifelse(is.na(n_exhibs), 0, n_exhibs)) %>% 
       na.omit() %>% 
@@ -313,117 +314,73 @@ server <- function(input, output, session) {
   
   
   
+  
+  
   ##### Choropleth Map #####
   # Render an interactive choropleth map based on the filtered data
   output$choropleth <- renderLeaflet({
-    req(input$selected_artist)
-    req(input$selected_country)
-    req(input$selected_venue)
+    req(input$artist_selection)
+    req(input$country_selection)
+    req(input$venue_selection)
     req(input$period)
     
     # prepare the plot data (summarise)
     artvis %>%
       # apply the filters
-      filter(e.startdate %>% between(input$period[1], input$period[2])) %>% 
-      filter(a.fullname %in% input$selected_artist) %>% 
-      filter(e.country %in% input$selected_country) %>% 
-      filter(e.venue %in% input$selected_venue) %>% 
-      group_by(e.country) %>%
-      summarise(n_exhibits = n_distinct(e.id)) %>%
+      filter(a.fullname %in% input$artist_selection) %>% 
+      filter(e.country %in% input$country_selection) %>% 
+      filter(e.venue %in% input$venue_selection) %>% 
+      get_aggregate("e.country") %>%
       # pass it to the choropleth
-      choropleth("n_exhibits", "e.country")
+      choropleth("n", "e.country")
   })
   
   
   
   
+  ##### Barplot function for top k value groups #####
+  top_k_barplot <- function(grouping.var, k=10){
+    artvis %>% 
+      get_aggregate(grouping.var) %>% 
+      arrange(desc(n)) %>% 
+      head(k) %>% 
+      ggplot(aes(x=fct_reorder(!!sym(grouping.var), n, .desc = T), y=n, fill=n)) +
+      geom_bar(stat = "identity") +
+      theme_minimal() +
+      theme(
+        axis.title = element_blank(),
+        # axis.text = element_blank(),
+        # axis.text.x = element_text(angle = 45, vjust = 0.5, hjust=1),
+        # plot.margin = margin(t = 5, r = 5, b = 20, l = 5),
+        panel.grid = element_blank()
+      )
+  }
   
-  k <- 10
   ##### Top Artists Barplot #####
   output$top_k_artists <- renderPlot({
-    req(input$selected_artist)
-    req(input$selected_country)
-    req(input$selected_venue)
+    req(input$artist_selection)
+    req(input$country_selection)
+    req(input$venue_selection)
     req(input$period)
-
-    artvis %>% 
-      # apply the filters
-      filter(e.startdate %>% between(input$period[1], input$period[2])) %>% 
-      filter(a.fullname %in% input$selected_artist) %>% 
-      filter(e.country %in% input$selected_country) %>% 
-      filter(e.venue %in% input$selected_venue) %>% 
-      group_by(a.fullname) %>% 
-      summarise(n_exhibs = n_distinct(e.title)) %>% 
-      mutate(n_exhibs=ifelse(is.na(n_exhibs), 0, n_exhibs)) %>% 
-      arrange(desc(n_exhibs)) %>% 
-      head(k) %>% 
-      ggplot(aes(x=fct_reorder(a.fullname, n_exhibs, .desc = T), y=n_exhibs, fill=n_exhibs)) +
-        geom_bar(stat = "identity") +
-        theme_minimal() +
-        theme(
-          axis.title = element_blank(),
-          # axis.text = element_blank(),
-          panel.grid = element_blank()
-        )
+    top_k_barplot("a.fullname")
     })
-  
   
   ##### Barplot Top Countries #####
   output$top_k_countries <- renderPlot({
-    req(input$selected_artist)
-    req(input$selected_country)
-    req(input$selected_venue)
+    req(input$artist_selection)
+    req(input$country_selection)
+    req(input$venue_selection)
     req(input$period)
-    
-    artvis %>% 
-      # apply filters
-      # apply the filters
-      filter(e.startdate %>% between(input$period[1], input$period[2])) %>% 
-      filter(a.fullname %in% input$selected_artist) %>% 
-      filter(e.country %in% input$selected_country) %>% 
-      filter(e.venue %in% input$selected_venue) %>% 
-      group_by(e.country) %>% 
-      summarise(n_exhibs = n_distinct(e.title)) %>% 
-      mutate(n_exhibs=ifelse(is.na(n_exhibs), 0, n_exhibs)) %>% 
-      arrange(desc(n_exhibs)) %>% 
-      head(k) %>% 
-      ggplot(aes(x=fct_reorder(e.country, n_exhibs, .desc = T), y=n_exhibs, fill=n_exhibs)) +
-        geom_bar(stat = "identity") +
-        theme_minimal() +
-        theme(
-          axis.title = element_blank(),
-          # axis.text = element_blank(),
-          panel.grid = element_blank()
-        )
+    top_k_barplot("e.country")
     })
-  
   
   ##### Barplot Top Venues #####
   output$top_k_venues <- renderPlot({
-    req(input$selected_artist)
-    req(input$selected_country)
-    req(input$selected_venue)
+    req(input$artist_selection)
+    req(input$country_selection)
+    req(input$venue_selection)
     req(input$period)
-    
-    artvis %>% 
-      # apply the filters
-      filter(e.startdate %>% between(input$period[1], input$period[2])) %>% 
-      filter(a.fullname %in% input$selected_artist) %>% 
-      filter(e.country %in% input$selected_country) %>% 
-      filter(e.venue %in% input$selected_venue) %>% 
-      group_by(e.venue) %>% 
-      summarise(n_exhibs = n_distinct(e.title)) %>% 
-      mutate(n_exhibs=ifelse(is.na(n_exhibs), 0, n_exhibs)) %>% 
-      arrange(desc(n_exhibs)) %>% 
-      head(k) %>% 
-      ggplot(aes(x=fct_reorder(e.venue, n_exhibs, .desc = T), y=n_exhibs, fill=n_exhibs)) +
-        geom_bar(stat = "identity") +
-        theme_minimal() +
-        theme(
-          axis.title = element_blank(),
-          # axis.text = element_blank(),
-          panel.grid = element_blank()
-        )
+    top_k_barplot("e.venue")
     })
   
   
