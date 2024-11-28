@@ -29,10 +29,10 @@ ui <- fluidPage(
         margin-right: 1%; /* Add spacing between plots */
       }
       
-      
       /* Allow for vertical scrolling */
       .scrollBox {
         overflow-y: scroll;
+        height:25vh;
       }
       
       /* TRANSPARENT */
@@ -48,22 +48,20 @@ ui <- fluidPage(
   fluidRow(
     textOutput("display"),   # Display for debugging
     # Left column for filter selection
+    # i wrap each MC widget in a div to be able to specify their height
     column(2,
            htmlOutput("variable_selection"),  # Dropdown for selecting the variable to count
            # Multi-select for selecting artists
            div(
              htmlOutput("artist_selection"),
-             style='height:25vh',
              class = "scrollBox",
             ),
            div(
              htmlOutput("country_selection"),   # Multi-select for selecting countries
-             style='height:25vh',
              class = "scrollBox",
             ),
            div(
              htmlOutput("venue_selection"),      # Multi-select for selecting venues
-             style='height:25vh',
              class = "scrollBox",
             ),
     ),
@@ -102,7 +100,7 @@ server <- function(input, output, session) {
       a.fullname = paste(a.firstname, a.lastname),
       a.fullname.rev = paste(a.lastname, a.firstname, sep=", "),
       # i think its wise to always use lastname first
-      a.fullname = a.fullname.rev
+      a.fullname = a.fullname.rev,
     )
   
   # Define colors for active and inactive data points
@@ -123,10 +121,35 @@ server <- function(input, output, session) {
     selectizeInput(
       inputId = "var_of_interest",
       label = "Select a variable to count",
-      choices = list("Number of exhibitions"="exhibitions", 
+      choices = list("Number of exhibitions"="e.id", 
                      "Number of paintings"="paintings"),
     )
   })
+  
+  
+  # get the number 
+  get_aggregate <- function(data, grouping.var){
+    # aggregate the selected variable per artist
+    data %>% 
+      # apply the date filter
+      filter(e.startdate %>% between(input$period[1], input$period[2])) %>% 
+      group_by(across(all_of(grouping.var))) %>% 
+      # depending on the selected grouping.variable
+      # perform a different aggregation
+      # for "Number of exhibitions": count unique exhibition IDs per group
+      # for "Number of paintings": sum up painting counts of all exhibition per group
+      {
+        if (input$var_of_interest == "e.id") summarise(., n = n_distinct(e.id))
+        else summarise(., n = sum(e.paintings, na.rm = TRUE))
+      } %>% 
+      # now join it back with all artists so that filtered out artists
+      # get a zero
+      right_join(data %>% select(!!grouping.var) %>% unique()) %>%
+      mutate(n = ifelse(is.na(n), 0, n)) %>%
+      arrange(!!sym(grouping.var)) %>%
+      .$n
+  }
+  
   
   
   ##### Get aggregates of selected variable #####
@@ -135,17 +158,7 @@ server <- function(input, output, session) {
     req(input$var_of_interest)
     req(input$period)
     # aggregate the selected variable per artist
-    artvis %>% 
-      # apply the date filter
-      filter(e.startdate %>% between(input$period[1], input$period[2])) %>% 
-      group_by(a.fullname) %>% 
-      summarise(n = n_distinct(e.id)) %>% 
-      # now join it back with all artists so that filtered out artists
-      # get a zero
-      right_join(artvis %>% select(a.fullname) %>% unique()) %>% 
-      mutate(n = ifelse(is.na(n), 0, n)) %>% 
-      arrange(a.fullname) %>% 
-      .$n
+    artvis %>% get_aggregate("a.fullname")
   })
   
   
@@ -154,17 +167,7 @@ server <- function(input, output, session) {
     req(input$var_of_interest)
     req(input$period)
     # aggregate the selected variable per artist
-    artvis %>% 
-      # apply the date filter
-      filter(e.startdate %>% between(input$period[1], input$period[2])) %>% 
-      group_by(e.country) %>% 
-      summarise(n = n_distinct(e.id)) %>% 
-      # now join it back with all artists so that filtered out artists
-      # get a zero
-      right_join(artvis %>% select(e.country) %>% unique()) %>% 
-      mutate(n = ifelse(is.na(n), 0, n)) %>% 
-      arrange(e.country) %>% 
-      .$n
+    artvis %>% get_aggregate("e.country")
   })
   
   
@@ -173,17 +176,7 @@ server <- function(input, output, session) {
     req(input$var_of_interest)
     req(input$period)
     # aggregate the selected variable per artist
-    artvis %>% 
-      # apply the date filter
-      filter(e.startdate %>% between(input$period[1], input$period[2])) %>% 
-      group_by(e.venue) %>% 
-      summarise(n = n_distinct(e.id)) %>% 
-      # now join it back with all artists so that filtered out artists
-      # get a zero
-      right_join(artvis %>% select(e.venue) %>% unique()) %>% 
-      mutate(n = ifelse(is.na(n), 0, n)) %>% 
-      arrange(e.venue) %>% 
-      .$n
+    artvis %>% get_aggregate("e.venue")
   })
   
   
@@ -217,7 +210,6 @@ server <- function(input, output, session) {
 
     
   ##### Multiple Choice Filter Widgets #####
-  
   multiple_selection_container <- function(intputId, label="", options, values=NULL){
     # options: vector of option values
     # prefix: prefix of input variable name
@@ -269,54 +261,6 @@ server <- function(input, output, session) {
   
   
   
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  ##### Country Selection Widget #####
-  # Multi-select dropdown for choosing countries
-  # output$country_selection <- renderUI({
-  #   # get all artist names, sorted
-  #   # return the multiple choice pickerInput
-  #   pickerInput(
-  #     "selected_country",
-  #     "Select a country",
-  #     choices = all.countries,
-  #     selected = all.countries, # start with preselection of all all.countries
-  #     options = pickerOptions(
-  #       actionsBox = TRUE, 
-  #       size = 10,
-  #       selectedTextFormat = "count > 3"
-  #     ), 
-  #     multiple = TRUE, # mulitple choice
-  #   )
-  # })
-  
-  
-  
-  ##### Venue Selection Widget #####
-  # # Multi-select dropdown for choosing venues
-  # output$venue_selection <- renderUI({
-  #   # return the multiple choice pickerInput
-  #   pickerInput(
-  #     "selected_venue",
-  #     "Select a venue",
-  #     choices = all.venues,
-  #     selected = all.venues, # start with preselection of all all.venues
-  #     options = pickerOptions(
-  #       actionsBox = TRUE, 
-  #       size = 10,
-  #       selectedTextFormat = "count > 3"
-  #     ), 
-  #     multiple = TRUE, # mulitple choice
-  #   )
-  # })
-  # 
   
   
   
