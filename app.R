@@ -10,6 +10,9 @@ library(stringr)       # String manipulation functions
 library(tidyverse)     # Data manipulation and visualization
 library(shinyWidgets)  # Additional UI widgets for Shiny
 library(leaflet)       # Interactive maps
+library(RColorBrewer)  # Custom color maps
+library(scales)        # adding linebreaks to x scale ticks
+library(countrycode)
 
 # Source external helper functions for choropleth map
 source("./choropleth.R")
@@ -21,12 +24,42 @@ ui <- fluidPage(
     # Custom CSS for inline plots
     tags$style(HTML("
       
+      /* BODY */
+      body {
+        background: #F8F8F8;
+      }
+      
+      /* BOXES */
+      .box {
+        background: #FFF;
+        border-radius: 20px;
+        box-shadow: 2px 2px 40px #BFBFBF;
+        margin: 20px;
+        padding: 20px 30px;
+      }
+      
+      /* LEFTMOST BOX SHOULD HAVE NO LEFT MARGIN, AND VICE VERSA FOR RIGHTMOST */
+      .leftmost {
+      }
+      .rightmost {
+      }
+      
+      
+      .flex-container {
+        display: flex;
+        justify-content: space-between;
+        padding: 0px 20px;
+      }
+
+      .flex-container > div {
+        margin: 0px 20px;
+      }
+      
       /* 30% with inline barplots */
       .inline-plot {
         display: inline-block;
-        width: 30%; /* Span 30% of the available space */
-        vertical-align: top; /* Align plots inline at the top */
-        margin-right: 1%; /* Add spacing between plots */
+        width: 32%; 
+        vertical-align: top;
       }
       
       /* Allow for vertical scrolling */
@@ -40,6 +73,26 @@ ui <- fluidPage(
         opacity: 0.5;
       }
       
+      
+      /* TIMELINE IS A LITTLE TOO WIDE */
+      .time-selector {
+        margin-left:  80px;
+        margin-right: 70px;
+      }
+      
+      h2 {
+        font-family: 'Georgia', 'Times New Roman', serif; 
+        font-size: 18px; 
+        font-weight: normal; 
+        color: #333333; 
+        letter-spacing: 2px; 
+        margin-top: 0px; 
+        margin-bottom: 15px;
+        border-bottom: 2px solid #999999; /* Underline for decoration */
+        padding-bottom: 5px; /* Space between the text and the underline */
+      }
+
+      
     "))
   ),
   
@@ -49,39 +102,58 @@ ui <- fluidPage(
     textOutput("display"),   # Display for debugging
     # Left column for filter selection
     # i wrap each MC widget in a div to be able to specify their height
-    column(2,
-           htmlOutput("variable_selection"),  # Dropdown for selecting the variable to count
+    column(3,
+           # Dropdown for selecting the variable to count
+           div(
+             tags$h2( "Select a variable"),
+             htmlOutput("variable_selection"), 
+             class = "box",
+            ),
            # Multi-select for selecting artists
            div(
+             tags$h2( "Artist selection"),
              htmlOutput("artist_selection"),
-             class = "scrollBox",
+             class = "scrollBox box",
             ),
+           # Multi-select for selecting countries
            div(
-             htmlOutput("country_selection"),   # Multi-select for selecting countries
-             class = "scrollBox",
+             tags$h2( "Country selection"),
+             htmlOutput("country_selection"),   
+             class = "scrollBox box",
             ),
+           # Multi-select for selecting venues
            div(
-             htmlOutput("venue_selection"),      # Multi-select for selecting venues
-             class = "scrollBox",
+             tags$h2( "Venue selection"),
+             htmlOutput("venue_selection"),      
+             class = "scrollBox box",
             ),
     ),
     # Right column for visualizations
-    column(10,
+    column(9,
            fluidRow(
              plotOutput("vals_over_time", height = "100px"), # Bar plot for values over time
-             htmlOutput("time_selection"),   # Slider input for selecting time range
-             height = "10%"
+             # Slider input for selecting time range
+             div(htmlOutput("time_selection"), class="time-selector"),
+             textOutput("test"),
+             height = "10%", class="box"
            ),
+           # Interactive choropleth map
            fluidRow(
-             leafletOutput("choropleth"),    # Interactive choropleth map
-             height="60%"),
-           fluidRow(
-             # Three inline bar plots for top artists, countries, and venues
-             div(class = "inline-plot", plotOutput("top_k_artists")),
-             div(class = "inline-plot", plotOutput("top_k_countries")),
-             div(class = "inline-plot", plotOutput("top_k_venues")),
+             leafletOutput("choropleth"),    
+             height="60%", class="box"),
+           # Three inline bar plots for top artists, countries, and venues
+           fluidRow(div(class = "flex-container",
+              div(class = "inline-plot box leftmost", 
+                tags$h2( "Top 10 Artists"),
+                plotOutput("top_k_artists")),
+              div(class = "inline-plot box", 
+                tags$h2("Top 10 Countries"),
+                plotOutput("top_k_countries")),
+              div(class = "inline-plot box rightmost", 
+                tags$h2("Top 10 Venues"),
+                plotOutput("top_k_venues")),
              height = "30%"
-           ),
+           )),
          ),
   ),
 )
@@ -101,11 +173,14 @@ server <- function(input, output, session) {
       a.fullname.rev = paste(a.lastname, a.firstname, sep=", "),
       # i think its wise to always use lastname first
       a.fullname = a.fullname.rev,
-    )
+    ) %>% 
+    mutate(e.country.name = e.country %>% countrycode("iso2c", "country.name.en"))
+    # print()
   
   # Define colors for active and inactive data points
   color.active <- "orange"
   color.inactive <- "gray"
+  color.scale <- "BuGn"
   
   
   # Extract the range of years from the dataset
@@ -120,7 +195,8 @@ server <- function(input, output, session) {
   output$variable_selection <- renderUI({
     selectizeInput(
       inputId = "var_of_interest",
-      label = "Select a variable to count",
+      # label = "Select a variable to count",
+      label = "",
       choices = list("Number of exhibitions"="e.id", 
                      "Number of paintings"="paintings"),
     )
@@ -171,7 +247,7 @@ server <- function(input, output, session) {
     req(input$var_of_interest)
     req(input$period)
     # aggregate the selected variable per artist
-    artvis %>% get_aggregate("e.country", keep.groups=FALSE)
+    artvis %>% get_aggregate("e.country.name", keep.groups=FALSE)
   })
   
   
@@ -240,7 +316,7 @@ server <- function(input, output, session) {
   ##### Artist Selection Widget #####
   output$artist_selection <- multiple_selection_container(
     intputId = "artist_selection",
-    label = "Select artists",
+    # label = "Select artists",
     options = all.artists,
     values = artist.totals
   )
@@ -248,7 +324,7 @@ server <- function(input, output, session) {
   ##### Country Selection Widget #####
   output$country_selection <- multiple_selection_container(
     intputId = "country_selection",
-    label = "Select countries",
+    # label = "Select countries",
     options = all.countries,
     values = country.totals
   )
@@ -256,7 +332,7 @@ server <- function(input, output, session) {
   ##### Venue Selection Widget #####
   output$venue_selection <- multiple_selection_container(
     intputId = "venue_selection",
-    label = "Select venues",
+    # label = "Select venues",
     options = all.venues,
     values = venue.totals
   )
@@ -274,7 +350,8 @@ server <- function(input, output, session) {
   # Slider input for selecting a time range
   output$time_selection <- renderUI({
     min_val = all_years %>% min()
-    max_val = all_years %>% max()
+    # add 1 extra year so that the timeline picker surrounds all years
+    max_val = (all_years %>% max())+1
 
     sliderTextInput("period",
                 NULL,
@@ -285,6 +362,8 @@ server <- function(input, output, session) {
                 choices=seq(min_val, max_val)
     )
   })
+  
+  # output$test <- renderText(input$period)
   
   
   ##### Barplot: Exhibitions Over Time #####
@@ -327,15 +406,13 @@ server <- function(input, output, session) {
     # prepare the plot data (summarise)
     artvis %>%
       # apply the filters
-      filter(a.fullname %in% input$artist_selection) %>% 
-      filter(e.country %in% input$country_selection) %>% 
-      filter(e.venue %in% input$venue_selection) %>% 
+      # filter(a.fullname %in% input$artist_selection) %>% 
+      # filter(e.country %in% input$country_selection) %>% 
+      # filter(e.venue %in% input$venue_selection) %>% 
       get_aggregate("e.country") %>%
       # pass it to the choropleth
-      choropleth("n", "e.country")
+      choropleth("n", "e.country", colors=color.scale)
   })
-  
-  
   
   
   ##### Barplot function for top k value groups #####
@@ -344,17 +421,27 @@ server <- function(input, output, session) {
       get_aggregate(grouping.var) %>% 
       arrange(desc(n)) %>% 
       head(k) %>% 
-      ggplot(aes(x=fct_reorder(!!sym(grouping.var), n, .desc = T), y=n, fill=n)) +
-      geom_bar(stat = "identity") +
-      theme_minimal() +
-      theme(
-        axis.title = element_blank(),
-        # axis.text = element_blank(),
-        # axis.text.x = element_text(angle = 45, vjust = 0.5, hjust=1),
-        # plot.margin = margin(t = 5, r = 5, b = 20, l = 5),
-        panel.grid = element_blank()
-      )
+      # add line breaks to the grouping variable, so that long names dont make the plot narrow
+      # mutate(grouping.var = !!sym(grouping.var) %>% str_wrap(width=20)) %>%
+      ggplot(aes(x=fct_reorder(!!sym(grouping.var), n), y=n, fill=n)) +
+        geom_bar(stat = "identity") +
+        theme_minimal() +
+        scale_fill_distiller(palette = color.scale, direction = 1) +  
+        coord_flip() +  # Make the bars horizontal
+        guides(fill="none") +
+        scale_x_discrete(labels = label_wrap(20)) +
+        theme(
+          axis.title = element_blank(),
+          # axis.text = element_blank(),
+          # plot.margin = margin(t = 5, r = 5, b = 20, l = 5),
+          panel.background = element_rect(fill = "transparent", color = NA), 
+          plot.background = element_rect(fill = "transparent", color = NA),  
+          legend.background = element_rect(fill='transparent'),
+          legend.box.background = element_rect(fill='transparent'),
+          panel.grid = element_blank()
+        )
   }
+  
   
   ##### Top Artists Barplot #####
   output$top_k_artists <- renderPlot({

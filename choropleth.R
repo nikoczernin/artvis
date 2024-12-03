@@ -5,7 +5,7 @@ library(sf)
 WORLD_DATA <<- read_sf("./data/worldmap/TM_WORLD_BORDERS_SIMPL-0.3.shp")
 
 
-choropleth <<- function(plot_data, x, iso2_column="ISO2"){
+choropleth <<- function(plot_data, x, iso2_column="ISO2", colors="BuGn"){
   # plot data needs to have a coutnry  code iso2 column
   # you also have to rename the variable in the plot data 
   plot_data <- plot_data %>% rename(mapvar = x)
@@ -16,14 +16,15 @@ choropleth <<- function(plot_data, x, iso2_column="ISO2"){
   
   # create a palette
   mypalette <- colorNumeric(
-    palette = "YlOrBr", domain = map_data$mapvar,
+    palette = colors, 
+    domain = map_data$mapvar,
     na.color = "lightgray"
   )
   
   # Prepare the text for tooltips:
   tooltips <- paste(
                 "Country:", map_data$NAME, "<br/>", 
-                x, ":", map_data$mapvar
+                "Total:", map_data$mapvar
                 ) %>% 
     lapply(htmltools::HTML)
   
@@ -31,7 +32,7 @@ choropleth <<- function(plot_data, x, iso2_column="ISO2"){
   map_data %>% 
     leaflet() %>%
     addTiles() %>%
-    setView(0, 0, zoom = 4) %>%
+    setView(0, 50, zoom = 4) %>%
     addPolygons(
       fillColor = ~ mypalette(mapvar), 
       stroke = FALSE,
