@@ -13,6 +13,7 @@ library(leaflet)       # Interactive maps
 library(RColorBrewer)  # Custom color maps
 library(scales)        # adding linebreaks to x scale ticks
 library(countrycode)
+library(shinybrowser)
 
 # Source external helper functions for choropleth map
 source("./choropleth.R")
@@ -20,6 +21,7 @@ source("./choropleth.R")
 
 ##### User Interface (UI) for the Shiny App #####
 ui <- fluidPage(
+  shinybrowser::detect(),
   tags$head(
     # Custom CSS for inline plots
     tags$style(HTML("
@@ -44,6 +46,11 @@ ui <- fluidPage(
       .rightmost {
       }
       
+      /*
+      .height20 {
+        height: 20vh;
+      }
+      */
       
       .flex-container {
         display: flex;
@@ -76,8 +83,12 @@ ui <- fluidPage(
       
       /* TIMELINE IS A LITTLE TOO WIDE */
       .time-selector {
-        margin-left:  80px;
-        margin-right: 70px;
+        margin-left:  4%;
+        margin-right: 3%;
+      }
+      
+      .timebox {
+        padding-bottom:0;
       }
       
       h2 {
@@ -131,16 +142,19 @@ ui <- fluidPage(
     # Right column for visualizations
     column(9,
            fluidRow(
-             plotOutput("vals_over_time", height = "100px"), # Bar plot for values over time
+             plotOutput("vals_over_time", 
+                        height = "100px"
+                        ), # Bar plot for values over time
              # Slider input for selecting time range
              div(htmlOutput("time_selection"), class="time-selector"),
              textOutput("test"),
-             height = "10%", class="box"
+             class="box timebox"
            ),
            # Interactive choropleth map
            fluidRow(
              leafletOutput("choropleth"),    
-             height="60%", class="box"),
+             # height="60%", 
+             class="box "),
            # Three inline bar plots for top artists, countries, and venues
            fluidRow(div(class = "flex-container",
               div(class = "inline-plot box leftmost", 
@@ -152,7 +166,7 @@ ui <- fluidPage(
               div(class = "inline-plot box rightmost", 
                 tags$h2("Top 10 Venues"),
                 plotOutput("top_k_venues")),
-             height = "30%"
+             # height = "30%"
            )),
          ),
   ),
@@ -274,7 +288,7 @@ server <- function(input, output, session) {
   
   # get all country names, sorted
   all.countries <- artvis %>% 
-    .$e.country %>% 
+    .$e.country.name %>% 
     unique() %>% 
     sort() %>% 
     .[.!=""] # remove empty strings
@@ -290,13 +304,18 @@ server <- function(input, output, session) {
 
     
   ##### Multiple Choice Filter Widgets #####
-  multiple_selection_container <- function(intputId, label="", options, values=NULL){
+  multiple_selection_container <- function(intputId, label="", options, values=NULL, show.value=TRUE){
     # options: vector of option values
     # prefix: prefix of input variable name
     renderUI({
       # prepare the classes
       # if no values have been passed, just use empty values (not 0 though)
-      if (is.null(values)) values <- function() rep("", length(options))
+      if (is.null(values)) {
+        values <- function() rep("", length(options))
+        # add the total value of each option to the end of it in parenthesis
+        # TODO: this is currently not working, but who cares
+        if (show.values) options <- paste0(options, " (", values, ")")
+      }
       # to any values==0 we add the "transparent" class
       classes <- sapply(values(), function(v) ifelse(v == 0, "transparent", ""))
       checkboxGroupInput(
@@ -363,7 +382,7 @@ server <- function(input, output, session) {
     )
   })
   
-  # output$test <- renderText(input$period)
+  # output$test <- renderText(shinybrowser::get_height())
   
   
   ##### Barplot: Exhibitions Over Time #####
@@ -432,7 +451,7 @@ server <- function(input, output, session) {
         scale_x_discrete(labels = label_wrap(20)) +
         theme(
           axis.title = element_blank(),
-          # axis.text = element_blank(),
+          axis.text = element_text(size = 10),
           # plot.margin = margin(t = 5, r = 5, b = 20, l = 5),
           panel.background = element_rect(fill = "transparent", color = NA), 
           plot.background = element_rect(fill = "transparent", color = NA),  
