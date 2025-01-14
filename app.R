@@ -261,7 +261,7 @@ server <- function(input, output, session) {
     req(input$var_of_interest)
     req(input$period)
     # aggregate the selected variable per artist
-    artvis %>% get_aggregate("e.country.name", keep.groups=FALSE)
+    artvis %>% get_aggregate("e.country.name", keep.groups=FALSE) 
   })
   
   
@@ -425,9 +425,9 @@ server <- function(input, output, session) {
     # prepare the plot data (summarise)
     artvis %>%
       # apply the filters
-      # filter(a.fullname %in% input$artist_selection) %>% 
-      # filter(e.country %in% input$country_selection) %>% 
-      # filter(e.venue %in% input$venue_selection) %>% 
+      filter(a.fullname %in% input$artist_selection) %>%
+      filter(e.country.name %in% input$country_selection) %>%
+      filter(e.venue %in% input$venue_selection) %>%
       get_aggregate("e.country") %>%
       # pass it to the choropleth
       choropleth("n", "e.country", colors=color.scale)
@@ -437,6 +437,11 @@ server <- function(input, output, session) {
   ##### Barplot function for top k value groups #####
   top_k_barplot <- function(grouping.var, k=10){
     artvis %>% 
+      # apply the filters
+      filter(a.fullname %in% input$artist_selection) %>%
+      filter(e.country.name %in% input$country_selection) %>%
+      filter(e.venue %in% input$venue_selection) %>%
+      # get the aggregates
       get_aggregate(grouping.var) %>% 
       arrange(desc(n)) %>% 
       head(k) %>% 
