@@ -1,7 +1,7 @@
-# Author: [Your Name]
-# Date: [Today's Date]
+# Author: [Nikolaus Czernin]
+# Date: [15.1.2025]
 # Description: A Shiny app to visualize art exhibition data. 
-#              Includes interactive choropleth maps, bar plots, and filter options.
+# Includes interactive choropleth maps, bar plots, and filter options.
 
 
 # Required Libraries
@@ -489,10 +489,6 @@ server <- function(input, output, session) {
     top_k_barplot("e.venue")
     })
   
-  
-  # TODO: this code lets you get the width of the plot vals_over_time
-  # right_col_width <- reactive(session$clientData[["output_vals_over_time_width"]])
-    
 
 }
 
