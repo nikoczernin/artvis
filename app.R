@@ -3,6 +3,7 @@
 # Description: A Shiny app to visualize art exhibition data. 
 # Includes interactive choropleth maps, bar plots, and filter options.
 
+source("./package_install.R")
 
 # Required Libraries
 library(shiny)         # Core shiny library for building the app
@@ -103,7 +104,25 @@ ui <- fluidPage(
         padding-bottom: 5px; /* Space between the text and the underline */
       }
 
-      
+      // Select All Artists
+      $(document).on('click', '#select_all_artists', function() {
+        $('#artist_selection').selectize()[0].selectize.setValue($('#artist_selection').selectize()[0].selectize.options.map(o => o.value));
+      });
+    
+      // Deselect All Artists
+      $(document).on('click', '#deselect_all_artists', function() {
+        $('#artist_selection').selectize()[0].selectize.clear();
+      });
+    
+      // Select All Venues
+      $(document).on('click', '#select_all_venues', function() {
+        $('#venue_selection').selectize()[0].selectize.setValue($('#venue_selection').selectize()[0].selectize.options.map(o => o.value));
+      });
+    
+      // Deselect All Venues
+      $(document).on('click', '#deselect_all_venues', function() {
+        $('#venue_selection').selectize()[0].selectize.clear();
+      });
     "))
   ),
   
@@ -331,14 +350,61 @@ server <- function(input, output, session) {
     })
   }
   
+  observeEvent(input$select_all_venues, {
+    updateSelectizeInput(
+      session = session,
+      inputId = "venue_selection",
+      selected = all.venues
+    )
+  })
   
-  ##### Artist Selection Widget #####
-  output$artist_selection <- multiple_selection_container(
-    intputId = "artist_selection",
-    # label = "Select artists",
-    options = all.artists,
-    values = artist.totals
-  )
+  observeEvent(input$deselect_all_venues, {
+    updateSelectizeInput(
+      session = session,
+      inputId = "venue_selection",
+      selected = character(0)
+    )
+  })
+  
+  observeEvent(input$select_all_artists, {
+    updateSelectizeInput(
+      session = session,
+      inputId = "artist_selection",
+      selected = all.artists
+    )
+  })
+  
+  observeEvent(input$deselect_all_artists, {
+    updateSelectizeInput(
+      session = session,
+      inputId = "artist_selection",
+      selected = character(0)
+    )
+  })
+  
+  ##### Artist Selection Widget with "Select All" and "Deselect All" Buttons #####
+  output$artist_selection <- renderUI({
+    div(
+      # "Select All" and "Deselect All" buttons
+      fluidRow(
+        column(6, actionButton("select_all_artists", "Select All Artists")),
+        column(6, actionButton("deselect_all_artists", "Deselect All Artists"))
+      ),
+      br(),
+      # Selectize input for artist selection
+      selectizeInput(
+        inputId = "artist_selection",
+        label = "Select Artists",
+        choices = all.artists,
+        selected = NULL, # Preselect all artists
+        multiple = TRUE,
+        options = list(
+          placeholder = "Type to search for artists...",
+          plugins = list('remove_button') # Adds a remove button for selected items
+        )
+      )
+    )
+  })
   
   ##### Country Selection Widget #####
   output$country_selection <- multiple_selection_container(
@@ -348,13 +414,27 @@ server <- function(input, output, session) {
     values = country.totals
   )
 
-  ##### Venue Selection Widget #####
-  output$venue_selection <- multiple_selection_container(
-    intputId = "venue_selection",
-    # label = "Select venues",
-    options = all.venues,
-    values = venue.totals
-  )
+  ##### Venue Selection Widget with "Select All" and "Deselect All" Buttons #####
+  output$venue_selection <- renderUI({
+    div(
+      fluidRow(
+        column(6, actionButton("select_all_venues", "Select All Venues")),
+        column(6, actionButton("deselect_all_venues", "Deselect All Venues"))
+      ),
+      br(),
+      selectizeInput(
+        inputId = "venue_selection",
+        label = "Select Venues",
+        choices = all.venues,
+        selected = NULL, # No preselection
+        multiple = TRUE,
+        options = list(
+          placeholder = "Type to search for venues...",
+          plugins = list('remove_button') # Adds a remove button for selected items
+        )
+      )
+    )
+  })
   
   
   
